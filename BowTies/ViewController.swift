@@ -18,6 +18,7 @@ class ViewController: UIViewController {
 
   // MARK: - Properties
   var managedContext: NSManagedObjectContext?
+  var currentBowTie: BowTie?
 
   // MARK: - View Life Cycle
   override func viewDidLoad() {
@@ -35,6 +36,7 @@ class ViewController: UIViewController {
 
     do {
       let results = try managedContext?.fetch(request)
+      currentBowTie = results?.first
 
       populate(bowTie: results?.first)
     } catch let error as NSError {
@@ -49,11 +51,41 @@ class ViewController: UIViewController {
   }
 
   @IBAction func wear(_ sender: UIButton) {
+    guard let currentBowTie = self.currentBowTie else { return }
 
+    let times = currentBowTie.timesWorn
+    currentBowTie.timesWorn = times + 1
+    currentBowTie.lastWorn = Date()
+
+    do {
+      try managedContext?.save()
+      populate(bowTie: currentBowTie)
+    } catch let error as NSError {
+      print("Could not fetch \(error), \(error.userInfo)")
+    }
   }
 
   @IBAction func rate(_ sender: UIButton) {
+    let alert = UIAlertController(title: "New Rating",
+                                  message: "Rate this bow tie",
+                                  preferredStyle: .alert)
+    alert.addTextField { (textField) in
+      textField.keyboardType = .decimalPad
+    }
 
+    let cancelAction = UIAlertAction(title: "Cancel",
+                                     style: .cancel)
+    let saveAction = UIAlertAction(title: "Save",
+                                   style: .default) { [weak self] (action) in
+      if let textField = alert.textFields?.first {
+        self?.update(rating: textField.text)
+      }
+    }
+
+    alert.addAction(cancelAction)
+    alert.addAction(saveAction)
+
+    present(alert, animated: true)
   }
 }
 
@@ -125,6 +157,19 @@ private extension ViewController {
 
     favoriteLabel.isHidden = !bowTie.isFavorite
     view.tintColor = tintColor
+  }
+
+  func update(rating: String?) {
+    guard let ratingString = rating,
+          let rating = Double(ratingString) else { return }
+
+    do {
+      currentBowTie?.rating = rating
+      try managedContext?.save()
+      populate(bowTie: currentBowTie)
+    } catch let error as NSError {
+      print("Could not save \(error), \(error.userInfo)")
+    }
   }
 }
 
